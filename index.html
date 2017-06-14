@@ -1,756 +1,227 @@
+<?php
+/*
+  @author: Shahrukh Khan
+  @website: http://www.thesoftwareguy.in
+  @facebook fanpage: https://www.facebook.com/Thesoftwareguy7
+ */
+error_reporting(E_ALL & ~E_NOTICE);
+@ini_set('post_max_size', '64M');
+@ini_set('upload_max_filesize', '64M');
+
+/* * *********************************************** */
+// database constants
+define('DB_DRIVER', 'mysql');
+define('DB_SERVER', 'localhost');
+define('DB_SERVER_USERNAME', 'root');
+define('DB_SERVER_PASSWORD', '');
+define('DB_DATABASE', 'image_test');
+
+$dboptions = array(
+    PDO::ATTR_PERSISTENT => FALSE,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
+);
+
+try {
+  $DB = new PDO(DB_DRIVER . ':host=' . DB_SERVER . ';dbname=' . DB_DATABASE, DB_SERVER_USERNAME, DB_SERVER_PASSWORD, $dboptions);
+} catch (Exception $ex) {
+  echo $ex->getMessage();
+  die;
+}
+
+if (isset($_POST["sub1"]) || isset($_POST["sub2"])) {
+  // include resized library
+  require_once('./php-image-magician/php_image_magician.php');
+  $msg = "";
+  $valid_image_check = array("image/gif", "image/jpeg", "image/jpg", "image/png", "image/bmp", "video/mp4");
+  if (count($_FILES["user_files"]) > 0) {
+    $folderName = "uploads/";
+
+    $sql = "INSERT INTO tbl_images(image_name) VALUES (:img)";
+    $stmt = $DB->prepare($sql);
+
+    for ($i = 0; $i < count($_FILES["user_files"]["name"]); $i++) {
+
+      if ($_FILES["user_files"]["name"][$i] <> "") {
+
+        $image_mime = strtolower(image_type_to_mime_type(exif_imagetype($_FILES["user_files"]["tmp_name"][$i])));
+        // if valid image type then upload
+        if (in_array($image_mime, $valid_image_check)) {
+
+          $ext = explode("/", strtolower($image_mime));
+          $ext = strtolower(end($ext));
+          $filename = rand(10000, 990000) . '_' . time() . '.' . $ext;
+          $filepath = $folderName . $filename;
+
+          if (!move_uploaded_file($_FILES["user_files"]["tmp_name"][$i], $filepath)) {
+            $emsg .= "Failed to upload <strong>" . $_FILES["user_files"]["name"][$i] . "</strong>. <br>";
+            $counter++;
+          } else {
+            $smsg .= "<strong>" . $_FILES["user_files"]["name"][$i] . "</strong> uploaded successfully. <br>";
+
+            $magicianObj = new imageLib($filepath);
+            $magicianObj->resizeImage(100, 100);
+            $magicianObj->saveImage($folderName . 'thumb/' . $filename, 100);
+
+            /*             * ****** insert into database starts ******** */
+            try {
+              $stmt->bindValue(":img", $filename);
+              $stmt->execute();
+              $result = $stmt->rowCount();
+              if ($result > 0) {
+                // file uplaoded successfully.
+              } else {
+                // failed to insert into database.
+              }
+            } catch (Exception $ex) {
+              $emsg .= "<strong>" . $ex->getMessage() . "</strong>. <br>";
+            }
+            /*             * ****** insert into database ends ******** */
+          }
+        } else {
+          $emsg .= "<strong>" . $_FILES["user_files"]["name"][$i] . "</strong> not a valid image. <br>";
+        }
+      }
+    }
+
+
+    $msg .= (strlen($smsg) > 0) ? successMessage($smsg) : "";
+    $msg .= (strlen($emsg) > 0) ? errorMessage($emsg) : "";
+  } else {
+    $msg = errorMessage("You must upload atleast one file");
+  }
+}
+?>
 <!DOCTYPE html>
-<html lang="en">
-
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta name="description" content="IAMX, One Page Responsive HTML Resume Template">
-  <meta name="keywords" content="onepage, resume, CV HTML template, personal Vcard, html resume, free resume template, free HTML template, free bootstrap template, personal portfolio, free html portfolio">
-	<meta name="author" content="http://trendytheme.net/">
-
-	<title>Digital Resume | Bala Vignesh</title>
-
-  <!-- Web Fonts -->
-  <link href='http://fonts.googleapis.com/css?family=Roboto:400,300,500,700' rel='stylesheet' type='text/css'>
-	<!-- Bootstrap core CSS -->
-	<link href="assets/bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
-	<!-- Font Awesome CSS -->
-	<link href="assets/css/font-awesome.min.css" rel="stylesheet" media="screen">
-	<!-- Animate css -->
-  <link href="assets/css/animate.css" rel="stylesheet">
-  <!-- Magnific css -->
-	<link href="assets/css/magnific-popup.css" rel="stylesheet">
-	<!-- Custom styles CSS -->
-	<link href="assets/css/style.css" rel="stylesheet" media="screen">
-  <!-- Responsive CSS -->
-  <link href="assets/css/responsive.css" rel="stylesheet">
-
-  <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
-  <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
-  <!--[if lt IE 9]>
-      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
-      <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
-  <![endif]-->
-
-  <link rel="shortcut icon" href="assets/images/ico/favicon.png">
-  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="assets/images/ico/apple-touch-icon-144-precomposed.png">
-  <link rel="apple-touch-icon-precomposed" sizes="114x114" href="assets/images/ico/apple-touch-icon-114-precomposed.png">
-  <link rel="apple-touch-icon-precomposed" sizes="72x72" href="assets/images/ico/apple-touch-icon-72-precomposed.png">
-  <link rel="apple-touch-icon-precomposed" href="assets/images/ico/apple-touch-icon-57-precomposed.png">
-
-</head>
-
-<body>
-	<!-- Preloader -->
-	<div id="tt-preloader">
-		<div id="pre-status">
-			<div class="preload-placeholder"></div>
-		</div>
-	</div>
-
-	<!-- Home Section -->
-	<section id="home" class="tt-fullHeight" data-stellar-vertical-offset="50" data-stellar-background-ratio="0.2">
-		<div class="intro">
-			<div class="intro-sub">Computer Science Engineer</div>
-			<h1>Bala<span> Vignesh</span></h1>
-			<p>"HARDWIRED TO BE AN ENTREPRENEUR"</p>
-
-      <div class="social-icons">
-        <ul class="list-inline">
-          <li><a href="https://facebook.com/livewithbala"target=blank><i class="fa fa-facebook"></i></a></li>
-          <li><a href="https://twitter.com/livewithbala"target=blank><i class="fa fa-twitter"></i></a></li>
-		<li><a href="https://github.com/livewithbala"target=blank><i class="fa fa-trophy"></i></a></li>
-        </ul>
-      </div> <!-- /.social-icons -->
-		</div>
-
-		
-	</section><!-- End Home Section -->
-
-
-
-
-	<!-- Navigation -->
-	<header class="header">
-		<nav class="navbar navbar-custom" role="navigation">
-			<div class="container">
-				<div class="navbar-header">
-					<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#custom-collapse">
-						<span class="sr-only">Toggle navigation</span>
-						<span class="icon-bar"></span>
-						<span class="icon-bar"></span>
-						<span class="icon-bar"></span>
-					</button>
-					
-				</div>
-
-				<div class="collapse navbar-collapse" id="custom-collapse">
-					<ul class="nav navbar-nav navbar-right">
-						<li><a href="#home">Home</a></li>
-						<li><a href="#about">About</a></li>
-						<li><a href="#resume">Resume</a></li>
-						<li><a href="#skills">Skills</a></li>
-						<li><a href="#works">Works</a></li>
-						<li><a href="#blog">Blog</a></li>
-            <li><a href="#contact">Contact</a></li>
-					</ul>
-				</div>
-			</div><!-- .container -->
-		</nav>
-	</header><!-- End Navigation -->
-
-
-    <!-- About Section -->
-    <section id="about" class="about-section section-padding">
-      <div class="container">
-        <h2 class="section-title wow fadeInUp">About Me</h2>
-
-        <div class="row">
-
-          <div class="col-md-4 col-md-push-8">
-            <div class="biography">
-              <div class="myphoto">
-                <img src="assets/images/lol.jpg" alt="">
-              </div>
-              <ul>
-                <li><strong>Name:</strong> Bala Vignesh</li>
-                <li><strong>Date of birth:</strong> 22 May 1997</li>
-                <li><strong>Address:</strong> 30, Subbiah-Layout, Ashok Nagar, Coimbatore</li>
-                <li><strong>Nationality:</strong> India</li>
-                <li><strong>Phone:</strong> 95666 70355</li>
-                <li><strong>Email:</strong> baluviki00@gmail.com</li>
-              </ul>
-            </div>
-          </div> <!-- col-md-4 -->
-
-          <div class="col-md-8 col-md-pull-4">
-            <div class="short-info wow fadeInUp">
-              <h3>Objective</h3>
-              <p>Avid Learner with passion in entrepreneurship, will be able to think out of the box with some deep knowledge in the latest technological happenings and breakthroughs, Has developed more than couple of Functional Android app during my learning phase and has attended Google android developer certified course. Versatile in programming versed in C, C++, JAVA, HTML and Machine learning. Self-directed leader who fosters a collaborative and supportive team environment. </p>
-            </div>
-
-            <div class="short-info wow fadeInUp">
-              <h3>What I Do ?</h3>
-              <p>I have worked on couple of Websites and android app, i believe in learing via developing projects rather.</p>
-
-              <ul class="list-check">
-                <li>C/C++</li>
-                <li>Java</li>
-                <li>Web Development (HTML+CSS+JS+PHP)</li>
-                <li>Vector Art Designing</li>
-                <li>Video Editing (Adobe After Effects)</li>
-                <li>Familiar with Terminals</li>
-				<li>Image Processing (Adobe Photoshop Suite) </li>
-				<li>Android App Development</li>
-              </ul>
-            </div>
-
-          
-          </div>
-
-
-        </div> <!-- /.row -->
-      </div> <!-- /.container -->
-    </section><!-- End About Section -->
-
-
-    
-
-        <!--/.container-->
-      </div>
-      <!--/.overlay-->
-    </section>
-    <!-- /.Video Section -->
-
-
-    <!-- Resume Section -->
-    <section id="resume" class="resume-section section-padding">
-        <div class="container">
-            <h2 class="section-title wow fadeInUp">Resume</h2>
-            <div class="row">
-                <div class="col-md-12">
-                    <div class="resume-title">
-                        <h3>Education</h3>
-                    </div>
-                    <div class="resume">
-                        <ul class="timeline">
-                            <li>
-                                <div class="posted-date">
-                                    <span class="month">2007-2012</span>
-                                </div><!-- /posted-date -->
-
-                                <div class="timeline-panel wow fadeInUp">
-                                    <div class="timeline-content">
-                                        <div class="timeline-heading">
-                                            <h3>Secondary School</h3>
-                                            <span>Bharatiya Vidya Bhavan - Ajjanur</span>
-                                        </div><!-- /timeline-heading -->
-
-                                        <div class="timeline-body">
-                                            <p>Have Completed my Secondary Schooling with 89%</p>
-                                        </div><!-- /timeline-body -->
-                                    </div> <!-- /timeline-content -->
-                                </div><!-- /timeline-panel -->
-                            </li>
-
-                            <li class="timeline-inverted">
-                                <div class="posted-date">
-                                    <span class="month">2012-2014</span>
-                                </div><!-- /posted-date -->
-
-                                <div class="timeline-panel wow fadeInUp">
-                                    <div class="timeline-content">
-                                        <div class="timeline-heading">
-                                            <h3>Higher Secondary Schooling</h3>
-                                            <span>Bharatiya Vidya Bhavan - R.S.Puram</span>
-                                        </div><!-- /timeline-heading -->
-
-                                        <div class="timeline-body">
-                                            <p>Have Completed my Higher Secondary Schooling with 90%</p>
-                                        </div><!-- /timeline-body -->
-                                    </div> <!-- /timeline-content -->
-                                </div> <!-- /timeline-panel -->
-                            </li>
-
-                            <li>
-                                <div class="posted-date">
-                                  <span class="month">Currently Pursing</span>
-                                </div><!-- /posted-date -->
-
-                                <div class="timeline-panel wow fadeInUp">
-                                    <div class="timeline-content">
-                                        <div class="timeline-heading">
-                                            <h3>Degree</h3>
-                                            <span>Park College of Engineering and Technology</span>
-                                        </div><!-- /timeline-heading -->
-
-                                        <div class="timeline-body">
-                                            <p>The place where my life started to shape up</p>
-                                        </div><!-- /timeline-body -->
-                                    </div> <!-- /timeline-content -->
-                                </div><!-- /timeline-panel -->
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div><!-- /row -->
-
-            <div class="row">
-                <div class="col-md-12">
-                    <div class="resume-title">
-                        <h3>Experience</h3>
-                    </div>
-                    <div class="resume">
-                        <ul class="timeline">
-                            <li class="timeline-inverted">
-                                <div class="posted-date">
-                                  <span class="month">1st Year</span>
-                                </div><!-- /posted-date -->
-
-                                <div class="timeline-panel wow fadeInUp">
-                                    <div class="timeline-content">
-                                        <div class="timeline-heading">
-                                            <h3>24 Hour Smart Hackathon Contest</h3>
-                                            <span>Sri Sakthi College of Engineering and Technology</span>
-                                        </div><!-- /timeline-heading -->
-
-                                        <div class="timeline-body">
-                                                                                  </div><!-- /timeline-body -->
-                                    </div> <!-- /timeline-content -->
-                                </div> <!-- /timeline-panel -->
-                            </li>
-
-                            <li>
-                                <div class="posted-date">
-                                  <span class="month">3rd Year</span>
-                                </div><!-- /posted-date -->
-
-                                <div class="timeline-panel wow fadeInUp">
-                                    <div class="timeline-content">
-                                        <div class="timeline-heading">
-                                            <h3>Paper Presentation (VIKI)</h3>
-                                            <span>Karpagam College of Engineering</span>
-                                        </div><!-- /timeline-heading -->
-
-                                        <div class="timeline-body">
-                                            <p>2nd Place</p>
-                                        </div><!-- /timeline-body -->
-                                    </div> <!-- /timeline-content -->
-                                </div><!-- /timeline-panel -->
-                            </li>
-							 <li>
-                              
-                                <div class="timeline-panel wow fadeInUp">
-                                    <div class="timeline-content">
-                                        <div class="timeline-heading">
-                                            <h3>Paper Presentation (D-DOS)</h3>
-                                            <span>Sri Ramakrishna College of Engineering and Technology</span>
-                                        </div><!-- /timeline-heading -->
-
-                                        <div class="timeline-body">
-                                          
-                                        </div><!-- /timeline-body -->
-                                    </div> <!-- /timeline-content -->
-                                </div><!-- /timeline-panel -->
-                            </li>
-							 <li>
-                              
-                                <div class="timeline-panel wow fadeInUp">
-                                    <div class="timeline-content">
-                                        <div class="timeline-heading">
-                                            <h3>Project Presentation (TORNAS) </h3>
-                                            <span>Sri Krishna College of Engineering and Technology</span>
-                                        </div><!-- /timeline-heading -->
-
-                                        <div class="timeline-body">
-                                          
-                                        </div><!-- /timeline-body -->
-                                    </div> <!-- /timeline-content -->
-                                </div><!-- /timeline-panel -->
-                            </li>
-							
-                        </ul>
-                    </div>
-                </div>
-            </div><!-- /row -->
-        </div><!-- /.container -->
-    </section><!-- End Resume Section -->
-
-
-    <!-- Skills Section -->
-    <section id="skills" class="skills-section section-padding">
-      <div class="container">
-        <h2 class="section-title wow fadeInUp">Skills</h2>
-
-        <div class="row">
-          <div class="col-md-6">
-            <div class="skill-progress">
-              <div class="skill-title"><h3>Coding</h3></div> 
-              <div class="progress">
-                <div class="progress-bar six-sec-ease-in-out" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100" ><span>85%</span>
-                </div>
-              </div><!-- /.progress -->
-            </div><!-- /.skill-progress -->
-
-            <div class="skill-progress">
-              <div class="skill-title"><h3>Graphics Desgining</h3></div> 
-              <div class="progress">
-                <div class="progress-bar six-sec-ease-in-out" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" ><span>75%</span>
-                </div>
-              </div><!-- /.progress -->
-            </div><!-- /.skill-progress -->
-            <div class="skill-progress">
-              <div class="skill-title"><h3>Web Desgining</h3></div>  
-              <div class="progress">
-                <div class="progress-bar six-sec-ease-in-out" role="progressbar" aria-valuenow="90" aria-valuemin="0" aria-valuemax="100" ><span>90%</span>
-                </div>
-              </div><!-- /.progress -->
-            </div><!-- /.skill-progress -->
-          </div><!-- /.col-md-6 -->
-
-          <div class="col-md-6">
-            <div class="skill-progress">
-              <div class="skill-title"><h3>App Development</h3></div> 
-              <div class="progress">
-                <div class="progress-bar six-sec-ease-in-out" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" ><span>75%</span>
-                </div>
-              </div><!-- /.progress -->
-            </div><!-- /.skill-progress -->
-            <div class="skill-progress">
-              <div class="skill-title"><h3>Project Development</h3></div> 
-              <div class="progress">
-                <div class="progress-bar six-sec-ease-in-out" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100" ><span>85%</span>
-                </div>
-              </div><!-- /.progress -->
-            </div><!-- /.skill-progress -->
-            <div class="skill-progress">
-              <div class="skill-title"><h3>Terminals</h3></div>  
-              <div class="progress">
-                <div class="progress-bar six-sec-ease-in-out" role="progressbar" aria-valuenow="70" aria-valuemin="0" aria-valuemax="100" ><span>70%</span>
-                </div>
-              </div><!-- /.progress -->
-            </div><!-- /.skill-progress -->
-          </div><!-- /.col-md-6 -->
-        </div><!-- /.row -->
-
-        <div class="skill-chart text-center">
-          <h3>More skills</h3>
-        </div>
-          
-        <div class="row more-skill text-center">
-          <div class="col-xs-12 col-sm-4 col-md-2">
-              <div class="chart" data-percent="95" data-color="e74c3c">
-                    <span class="percent"></span>
-                    <div class="chart-text">
-                      <span>leadership</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xs-12 col-sm-4 col-md-2">
-              <div class="chart" data-percent="80" data-color="2ecc71">
-                    <span class="percent"></span>
-                    <div class="chart-text">
-                      <span>Creativity</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xs-12 col-sm-4 col-md-2">
-              <div class="chart" data-percent="90" data-color="3498db">
-                    <span class="percent"></span>
-                    <div class="chart-text">
-                      <span>Management</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xs-12 col-sm-4 col-md-2">
-              <div class="chart" data-percent="92" data-color="3498db">
-                    <span class="percent"></span>
-                    <div class="chart-text">
-                      <span>Branding</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xs-12 col-sm-4 col-md-2">
-              <div class="chart" data-percent="62" data-color="3498db">
-                    <span class="percent"></span>
-                    <div class="chart-text">
-                      <span>Marketing</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xs-12 col-sm-4 col-md-2">
-              <div class="chart" data-percent="89" data-color="3498db">
-                    <span class="percent"></span>
-                    <div class="chart-text">
-                      <span>Motivation</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-      </div><!-- /.container -->
-    </section><!-- End Skills Section -->
-
-
-    
-
-    <!-- Facts Section -->
-    <section id="facts" class="facts-section text-center" data-stellar-vertical-offset="50" data-stellar-background-ratio="0.2">
-      <div class="tt-overlay-bg">
-        <div class="container">
-          <div class="row">
-            <div class="col-md-12">
-              <div class="count-wrap">
-                <div class="col-sm-3 col-xs-6">
-                  <i class="fa fa-flask"></i>
-                  <h3 class="timer">0</h3>
-                  <p>Years of Experience</p>
-                </div>
-                <div class="col-sm-3 col-xs-6"> 
-                  <i class="fa fa-thumbs-up"></i>
-                  <h3 class="timer">7</h3>                
-                  <p>Projects Done</p>
-                </div>
-                <div class="col-sm-3 col-xs-6">
-                  <i class="fa fa-users"></i>
-                  <h3 class="timer">50000</h3> 
-                  <p>Happy Clients</p>
-                </div>
-                <div class="col-sm-3 col-xs-6">
-                  <i class="fa fa-trophy"></i>
-                  <h3 class="timer">0</h3> 
-                  <p>Awards Won</p>
-                </div>
-              </div><!-- /count-wrap -->
-            </div><!-- /.col-md-12 -->
-          </div><!-- /.row -->
-        </div><!-- /.container -->
-      </div>
-    </section> <!-- End Facts Section -->
-
-
-<section id="blog" class="latest-blog-section section-padding">
-      <div class="container">
-        <h2 class="section-title wow fadeInUp">Latest Post</h2>
-
-        <div class="row">
-          <div class="col-sm-4">
-            <article class="blog-post-wrapper">
-              <div class="figure">    
-                <div class="post-thumbnail">
-                  <a href="https://www.tamilmemetemplates.com/5-easy-ways-make-money-online/"><img src="https://i0.wp.com/www.tamilmemetemplates.com/wp-content/uploads/2017/06/freelancer-sketch.png?w=829&ssl=1" class="img-responsive " alt=""></a>
-                </div>
-                  <i class="fa fa-file-photo-o"></i>
-              </div><!-- /.figure -->
-              <header class="entry-header">
-                <div class="post-meta">
-                  <span class="the-category"> 
-                    <a href="#">Article on</a> <a href="#">Tamil Meme Templates</a>
-                  </span>
-                </div>
-                <h2 class="entry-title"><a href="https://www.tamilmemetemplates.com/5-easy-ways-make-money-online/" rel="">5 Easy ways to make money online</a></h2>
-                <hr>
-                <div class="entry-meta">
-                  <ul class="list-inline">
-                    <li>
-                      <span class="the-author">
-                        <a href="#">Admin</a> 
-                      </span>
-                    </li>
-                    <li>
-                      <span class="the-time">
-                        <a href="#">06 Jan 2015</a>
-                      </span>
-                    </li>
-                    <li>
-                      <span class="the-share">
-                        <a href="#" title="share">30</a>
-                      </span>
-                    </li>
-                    <li>
-                      <span class="the-comments">
-                        <a href="#" title="">05</a>
-                      </span>
-                    </li>
-                  </ul>
-                </div><!-- .entry-meta -->
-              </header><!-- .entry-header -->
-            </article>
-          </div><!-- /.col-sm-4 -->
-          <div class="col-sm-4">
-            <article class="blog-post-wrapper">
-              <div class="figure">    
-                <div class="post-thumbnail">
-                  <a href="https://itsmebv.blogspot.in/2016/10/thehalfbakedlovestorychapter1.html"><img src="https://3.bp.blogspot.com/-iihHSbQ5qXM/V1VkkwILKGI/AAAAAAAADGc/9cFtwFrYtE0jNroes9pqWq3XSC-sRGq1QCLcB/s1600/79.jpg" class="img-responsive " alt=""></a>
-                </div>
-                  <i class="fa fa-file-video-o"></i>
-              </div><!-- /.figure -->
-              <header class="entry-header">
-                <div class="post-meta">
-                  <span class="the-category"> 
-                    <a href="https://itsmebv.blogspot.in/2016/10/thehalfbakedlovestorychapter1.html">Half Baked </a> <a href="https://itsmebv.blogspot.in/2016/10/thehalfbakedlovestorychapter1.html">Love Story</a>
-                  </span>
-                </div>
-                <h2 class="entry-title"><a href="https://itsmebv.blogspot.in/2016/10/thehalfbakedlovestorychapter1.html" rel="">Where Reality meets Love</a></h2>
-                <hr>
-                <div class="entry-meta">
-                  <ul class="list-inline">
-                    <li>
-                      <span class="the-author">
-                        <a href="#">Admin</a> 
-                      </span>
-                    </li>
-                    <li>
-                      <span class="the-time">
-                        <a href="#">06 Jan 2015</a>
-                      </span>
-                    </li>
-                    <li>
-                      <span class="the-share">
-                        <a href="#" title="share">30</a>
-                      </span>
-                    </li>
-                    <li>
-                      <span class="the-comments">
-                        <a href="#" title="">05</a>
-                      </span>
-                    </li>
-                  </ul>
-                </div><!-- .entry-meta -->
-              </header><!-- .entry-header -->
-            </article>
-          </div><!-- /.col-sm-4 -->
-          <div class="col-sm-4">
-            <article class="blog-post-wrapper">
-              <div class="figure">    
-                <div class="post-thumbnail">
-                  <a href="https://itsmebv.blogspot.in/2016/10/100thingsthatcantbedenied.html"><img src="https://3.bp.blogspot.com/-ZMnqxRkyzUQ/V1VkHUhIT_I/AAAAAAAADGI/fEMRYY49h10tC1B9alRjaU_-ppV411K4ACLcB/s1600/77.jpg" class="img-responsive " alt=""></a>
-                </div>
-                  <i class="fa fa-quote-left"></i>
-              </div><!-- /.figure -->
-              <header class="entry-header">
-                <div class="post-meta">
-                  <span class="the-category"> 
-                    <a href="https://itsmebv.blogspot.in/2016/10/100thingsthatcantbedenied.html">Unsaid</a> <a href="https://itsmebv.blogspot.in/2016/10/100thingsthatcantbedenied.html">things</a>
-                  </span>
-                </div>
-                <h2 class="entry-title"><a href="https://itsmebv.blogspot.in/2016/10/100thingsthatcantbedenied.html" rel="">100 things you can't Deny in life</a></h2>
-                <hr>
-                <div class="entry-meta">
-                  <ul class="list-inline">
-                    <li>
-                      <span class="the-author">
-                        <a href="#">Admin</a> 
-                      </span>
-                    </li>
-                    <li>
-                      <span class="the-time">
-                        <a href="#">06 Jan 2015</a>
-                      </span>
-                    </li>
-                    <li>
-                      <span class="the-share">
-                        <a href="#" title="share">30</a>
-                      </span>
-                    </li>
-                    <li>
-                      <span class="the-comments">
-                        <a href="#" title="">05</a>
-                      </span>
-                    </li>
-                  </ul>
-                </div><!-- .entry-meta -->
-              </header><!-- .entry-header -->
-            </article>
-          </div><!-- /.col-md-4 -->
-        </div><!-- /.row -->
-        <div class="blog-more text-center">
-          <a href="https://itsmebv.blogspot.in" target=blank class="btn btn-primary">Visit Blog</a>
-        </div>
-        
-      </div><!-- /.container -->
-    </section><!-- End Blog Section -->   
-	
-<section id="skills" class="skills-section section-padding">
-      <div class="container">
-	  <h2 class="section-title wow fadeInUp">Impacts Made</h2>
-	  <div class="short-info wow fadeInUp">
-               <ul class="list-check">
-                <li>Tedx Organiser (Ted Talk)</li>
-                <li>Website Designer for TED</li>
-                <li>Streaming app for android</li>
-                <li>VR Secure(Android App)</li>
-                <li>Paisa Pay</li>
-                <li>Katlawg</li>
-				<li>TorNas</li>
-				<li>Google SDK Projects</li>
-				<li>Microsoft Alexa SDK</li>
-              </ul>
-			   <a href="https://github.com/livewithbala" target=blank class="btn btn-default">Peek my GIT</a>
-            </div>
-	  </div>
-	  </div>
-
-    <!-- Hire Section -->
-    <section class="hire-section text-center" data-stellar-vertical-offset="50" data-stellar-background-ratio="0.2">
-      <div class="hire-section-bg">
-        <div class="container">
-          <div class="row">
-            <div class="col-md-12">
-              <h2>Want to change to world ?</h2>
-              <a href="https://drive.google.com/file/d/0B1u6D4PdyCVfWDlTUlFMUGF0bDA/view?usp=sharing" target=blank class="btn btn-default">Hire me</a>
-            </div><!-- /.col-md-12 -->
-          </div><!-- /.row -->
-        </div><!-- /.container -->
-      </div><!-- /.hire-section-bg -->
-    </section><!-- End Hire Section -->
-
-
-
-    <!-- Contact Section -->
-    <section id="contact" class="contact-section section-padding">
-      <div class="container">
-        <h2 class="section-title wow fadeInUp">Get in touch</h2>
-
-        <div class="row">
-          <div class="col-md-6">
-            <div class="contact-form">
-              <strong>Send me a message</strong>
-              <form name="contact-form" id="contactForm" action="sendemail.php" method="POST">
-
-                <div class="form-group">
-                  <label for="name">Name</label>
-                  <input type="text" name="name" class="form-control" id="name" required="">
-                </div>
-
-                <div class="form-group">
-                  <label for="email">Email</label>
-                  <input type="email" name="email" class="form-control" id="email" required="">
-                </div>
-
-                <div class="form-group">
-                  <label for="subject">Subject</label>
-                  <input type="text" name="subject" class="form-control" id="subject">
-                </div>
-
-                <div class="form-group">
-                  <label for="message">Message</label>
-                  <textarea name="message" class="form-control" id="message" rows="5" required=""></textarea>
-                </div>
-
-                <button type="submit" name="submit" class="btn btn-primary">Send Message</button>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <link rel="icon" href="http://www.thesoftwareguy.in/favicon.ico" type="image/x-icon" />
+    <!--iOS/android/handheld specific -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Upload multiple images create thumbnails and save path to database with php and mysql">
+    <meta name="keywords" content="php, mysql, thumbnail,upload image, check mime type">
+    <meta name="author" content="Shahrukh Khan">
+    <title>Upload multiple images create thumbnails and save path to database with php and mysql - thesoftwareguy</title>
+    <link rel="stylesheet" href="style.css" type="text/css" />
+    <style>
+      .files{height: 30px; margin: 10px 10px 0 0;width: 250px; }
+      .add{ font-size: 14px; color: #EB028F; border: none; }
+      .rem a{ font-size: 14px; color: #f00; border: none; }
+      .submit{width: 110px; height: 30px; background: #6D37B0; color: #fff;text-align: center;}
+    </style>
+    <script src="jquery-1.9.0.min.js"></script>
+    <script>
+      $(document).ready(function() {
+        $(".add").click(function() {
+          $('<div><input class="files" name="user_files[]" type="file" ><span class="rem" ><a href="javascript:void(0);" >Remove</span></div>').appendTo(".contents");
+
+        });
+        $('.contents').on('click', '.rem', function() {
+          $(this).parent("div").remove();
+        });
+
+      });
+    </script>
+  </head>
+  <body>
+    <div id="container">
+      <div id="body">
+        <div class="mainTitle" >Upload multiple images create thumbnails and save path to database with php and mysql</div>
+        <div class="height20"></div>
+        <article>
+          <?php echo $msg; ?>
+          <div class="height20"></div>
+          <div style="width: 380px; margin: 0 auto;">
+            <h3 style="text-align: center;">Image will be resized to 100px X 100px </h3>
+            <form name="f1" action="index.php" method="post" enctype="multipart/form-data">            
+              <fieldset>
+                <legend>Demo1</legend>
+                Attach multiple Files:
+                <input class="files" name="user_files[]" type="file" multiple="multiple" >
+				 <input class="files" name="user_files[]" type="file" multiple="multiple" >
+                <div class="height10"></div>
+                <div><input type="submit" class="submit" name="sub1" value="Upload Images" /> </div>
+              </fieldset> 
+            </form>
+            <div style="width: 380px; margin: 0 auto;">
+              <form name="f2" action="index.php" method="post" enctype="multipart/form-data">
+                <fieldset>
+                  <legend>Demo2</legend>
+
+                  <input class="files" name="user_files[]" type="file" ><span><a href="javascript:void(0);" class="add" >Add More</a></span>
+                  <div class="contents"></div>
+                  <div class="height10"></div>
+                  <div><input type="submit" class="submit" name="sub2" value="Upload Images" /> </div>
+				  <button><a href="index69.php">"hi"</a></button>
+				   
+				  
+				   
+				  
+                </fieldset>
               </form>
-            </div><!-- /.contact-form -->
-          </div><!-- /.col-md-6 -->
-
-          <div class="col-md-6">
-            <div class="row center-xs">
-              <div class="col-sm-6">
-                <i class="fa fa-map-marker"></i>
-                <address>
-                  <strong>Address/Street</strong>
-                  30, Ashok Nagar<br>
-                  Coimbatore India<br>
-                </address>
-              </div>
-
-              <div class="col-sm-6">
-                <i class="fa fa-mobile"></i>
-                <div class="contact-number">
-                  <strong>Phone Number</strong>
-                   9566670355<br>
-                   </div>
-              </div>
-            </div>
-
-          <div class="row">
-            <div class="col-sm-12">
-              <div class="location-map">
-                <div id="mapCanvas" class="map-canvas"></div>
-              </div>
             </div>
           </div>
-
-          </div>
-        </div><!-- /.row -->
-      </div><!-- /.container -->
-    </section><!-- End Contact Section -->
-
-
-	<!-- Footer Section -->
-    <footer class="footer-wrapper">
-      <div class="container">
-        <div class="row">
-          <div class="col-md-12">
-            <div class="copyright text-center">
-              <p>&copy; Livewithbala</p>
-            </div>
-          </div>
-        </div>
+          <div class="height10"></div>
+          <?php
+          // fetch all records
+          $sql = "SELECT * FROM tbl_images WHERE 1 ";
+          try {
+            $stmt = $DB->prepare($sql);
+            $stmt->execute();
+            $images = $stmt->fetchAll();
+          } catch (Exception $ex) {
+            echo $ex->getMessage();
+          }
+          ?>
+          <table class="bordered">
+            <tr><th>ID</th><th>thumbnail</th><th>ORIGINAL</th></tr>
+            <?php
+            if (count($images) > 0) {
+              foreach ($images as $img) {
+                ?>
+                <tr>
+                  <td style="text-align: center;"><?php echo $img["id"]; ?></td>
+                  <td style="text-align: center;">
+                    <a href="uploads/thumb/<?php echo $img["image_name"]; ?>" target="_blank">
+                      <img src="uploads/thumb/<?php echo $img["image_name"]; ?>" alt="<?php echo $img["image_name"]; ?>">
+                    </a>
+                  </td>
+                  <td style="text-align: center;">
+                    <a href="uploads/<?php echo $img["image_name"]; ?>" target="_blank">
+                      <img src="uploads/<?php echo $img["image_name"]; ?>" alt="<?php echo $img["image_name"]; ?>" width="300" height="300">
+                    </a>
+                  </td>
+                </tr>  
+                <?php
+              }
+            } else {
+              ?>
+			   <tr>
+              <td colspan="3">No images in the database.</td>
+            </tr> 
+            <?php } ?>
+          </table>
+          <div class="height10"></div>
+        </article>
+        <div class="height10"></div>
+        <footer>
+          <div class="copyright"> &copy; 2013 <a href="http://www.thesoftwareguy.in" target="_blank">thesoftwareguy</a>. All rights reserved </div>
+          <div class="footerlogo"><a href="http://www.thesoftwareguy.in" target="_blank"><img src="http://www.thesoftwareguy.in/thesoftwareguy-logo-small.png" width="200" height="47" alt="thesoftwareguy logo" /></a> </div>
+        </footer>
       </div>
-    </footer><!-- End Footer Section -->
+    </div>
 
-
-	<!-- Scroll-up -->
-	<div class="scroll-up">
-		<a href="#home"><i class="fa fa-angle-up"></i></a>
-	</div>
-
-	<!-- Javascript files -->
-	<script src="assets/js/jquery.js"></script>
-	<script src="assets/bootstrap/js/bootstrap.min.js"></script>
-  <script src="assets/js/jquery.stellar.min.js"></script>
-	<script src="assets/js/jquery.sticky.js"></script>
-  <script src="assets/js/smoothscroll.js"></script>
-	<script src="assets/js/wow.min.js"></script>
-  <script src="assets/js/jquery.countTo.js"></script>
-  <script src="assets/js/jquery.inview.min.js"></script> 
-  <script src="assets/js/jquery.easypiechart.js"></script>
-  <script src="assets/js/jquery.shuffle.min.js"></script>
-  <script src="assets/js/jquery.magnific-popup.min.js"></script>
-  <script src="http://a.vimeocdn.com/js/froogaloop2.min.js"></script>
-  <script src="assets/js/jquery.fitvids.js"></script>
-  <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&amp;sensor=false"></script>
-  <script src="assets/js/scripts.js"></script>
-</body>
+  </body>
 </html>
+<?php
+
+function errorMessage($str) {
+  return '<div style="width:50%; margin:0 auto; border:2px solid #F00;padding:2px; color:#000; margin-top:10px; text-align:center;">' . $str . '</div>';
+}
+
+function successMessage($str) {
+  return '<div style="width:50%; margin:0 auto; border:2px solid #06C;padding:2px; color:#000; margin-top:10px; text-align:center;">' . $str . '</div>';
+}
+?>
